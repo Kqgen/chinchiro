@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>チンチロ</title>
+<style>
+  :root{
+    --gold:#d9b06a; --text:#efe6d8; --muted:#9a8f7f;
+    --good:#f0c256; --bad:#e0645f; --line:#2e2a26;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:26px 16px 44px; min-height:100vh;
+    background:radial-gradient(circle at 50% 30%, #23282f 0%, #14171c 55%, #0c0e11 100%);
+    color:var(--text); font-family:"Yu Gothic UI","Segoe UI",system-ui,sans-serif;
+    display:flex; flex-direction:column; align-items:center; gap:18px;
+    user-select:none; -webkit-tap-highlight-color:transparent;
+  }
+  h1{
+    margin:0; font-size:19px; letter-spacing:.42em; font-weight:600;
+    color:var(--gold); text-indent:.42em;
+  }
+  /* 「ロ」だけ押せるようにする。押しやすいよう余白を足し、
+     同じ分だけマイナスで打ち消すので、見た目は1ミリも変わらない */
+  h1 #secret{ padding:10px 6px; margin:-10px -6px; }
+
+  /* ── お椀 ── */
+  .bowl{
+    position:relative; width:min(320px,86vw); aspect-ratio:1/1; border-radius:50%;
+    background:
+      radial-gradient(circle at 50% 38%, #45261f 0%, #331813 48%, #200e0b 76%, #170908 100%);
+    box-shadow:
+      inset 0 14px 34px rgba(0,0,0,.8),
+      inset 0 -10px 26px rgba(255,170,120,.07),
+      0 20px 46px rgba(0,0,0,.65);
+    border:7px solid #5a3225;
+    transition:transform .12s ease;
+  }
+  .bowl::after{
+    content:""; position:absolute; inset:-7px; border-radius:50%;
+    box-shadow:inset 0 0 0 2px rgba(217,176,106,.34); pointer-events:none;
+  }
+  .bowl.shaking{ animation:shake .16s linear infinite; }
+  @keyframes shake{
+    0%{transform:translate(0,0) rotate(0)}
+    25%{transform:translate(-3px,2px) rotate(-.7deg)}
+    50%{transform:translate(2px,-3px) rotate(.6deg)}
+    75%{transform:translate(3px,2px) rotate(.7deg)}
+    100%{transform:translate(0,0) rotate(0)}
+  }
+
+  /* ── サイコロ ── */
+  .die{
+    position:absolute; left:50%; top:50%; width:52px; height:52px;
+    margin:-26px 0 0 -26px; border-radius:11px;
+    background:linear-gradient(150deg,#fffdf7 0%,#f2ece0 62%,#ded6c6 100%);
+    box-shadow:0 5px 12px rgba(0,0,0,.55), inset 0 -3px 6px rgba(0,0,0,.14);
+    display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr);
+    padding:7px; gap:2px;
+  }
+  .die i{ border-radius:50%; background:#2b2b2b; visibility:hidden; }
+  /* 1の目だけ赤 */
+  .die[data-v="1"] i{ background:#cc3b34 }
+  .die[data-v="1"] i:nth-child(5){visibility:visible}
+  .die[data-v="2"] i:nth-child(1),.die[data-v="2"] i:nth-child(9){visibility:visible}
+  .die[data-v="3"] i:nth-child(1),.die[data-v="3"] i:nth-child(5),.die[data-v="3"] i:nth-child(9){visibility:visible}
+  .die[data-v="4"] i:nth-child(1),.die[data-v="4"] i:nth-child(3),
+  .die[data-v="4"] i:nth-child(7),.die[data-v="4"] i:nth-child(9){visibility:visible}
+  .die[data-v="5"] i:nth-child(1),.die[data-v="5"] i:nth-child(3),.die[data-v="5"] i:nth-child(5),
+  .die[data-v="5"] i:nth-child(7),.die[data-v="5"] i:nth-child(9){visibility:visible}
+  .die[data-v="6"] i:nth-child(1),.die[data-v="6"] i:nth-child(3),.die[data-v="6"] i:nth-child(4),
+  .die[data-v="6"] i:nth-child(6),.die[data-v="6"] i:nth-child(7),.die[data-v="6"] i:nth-child(9){visibility:visible}
+
+  /* ── 結果 ── */
+  .result{ text-align:center; min-height:74px; }
+  .yaku{
+    font-size:38px; font-weight:800; letter-spacing:.06em; line-height:1.15;
+    color:var(--gold); opacity:0; transform:translateY(8px) scale(.94);
+    transition:opacity .3s ease, transform .3s cubic-bezier(.2,1.5,.4,1);
+  }
+  .yaku.show{ opacity:1; transform:none }
+  .yaku.good{ color:var(--good); text-shadow:0 0 26px rgba(240,194,86,.5) }
+  .yaku.bad{ color:var(--bad) }
+  .note{ font-size:13px; color:var(--muted); margin-top:6px; opacity:0; transition:opacity .3s ease }
+  .note.show{ opacity:1 }
+
+  /* ── ボタン ── */
+  button.roll{
+    padding:17px 54px; font-size:20px; font-weight:700; letter-spacing:.18em;
+    color:#241608; font-family:inherit; cursor:pointer; border:none; border-radius:999px;
+    background:linear-gradient(180deg,#e7c07a 0%,#c99a4c 100%);
+    box-shadow:0 7px 18px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.5);
+    transition:transform .08s ease, filter .15s ease;
+  }
+  button.roll:hover{ filter:brightness(1.07) }
+  button.roll:active{ transform:translateY(2px) scale(.98) }
+  button.roll:disabled{ filter:grayscale(.6) brightness(.75); cursor:default; transform:none }
+
+  /* ── 記録 ── */
+  .hist{ width:min(340px,90vw); border-top:1px solid var(--line); padding-top:16px }
+  .hist h2{
+    font-size:11px; color:var(--muted); letter-spacing:.14em; margin:0 0 10px; font-weight:600;
+    display:flex; justify-content:space-between; align-items:baseline;
+  }
+  .hist h2 span{ letter-spacing:0; font-weight:400; color:#6b6358 }
+
+  /* 役ごとの回数 */
+  .tally{ display:flex; gap:4px; margin-bottom:12px }
+  .tally div{
+    flex:1; text-align:center; padding:7px 1px; font-size:9px; color:var(--muted);
+    background:rgba(255,255,255,.035); border:1px solid var(--line); border-radius:8px;
+  }
+  .tally b{ display:block; font-size:15px; color:var(--text); font-weight:700; margin-bottom:2px }
+  .tally .hit b{ color:var(--good) }
+
+  /* スクロールできる履歴 */
+  .scroll{ max-height:300px; overflow-y:auto; padding-right:5px }
+  .scroll::-webkit-scrollbar{ width:6px }
+  .scroll::-webkit-scrollbar-thumb{ background:#3d372f; border-radius:99px }
+  .scroll::-webkit-scrollbar-track{ background:transparent }
+  .hist ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:5px }
+  .hist li{
+    display:flex; align-items:center; gap:10px; font-size:13px;
+    background:rgba(255,255,255,.035); border:1px solid var(--line);
+    border-radius:9px; padding:8px 12px;
+  }
+  .hist .no{ color:#6b6358; font-size:11px; min-width:32px; font-variant-numeric:tabular-nums }
+  .hist .eyes{ font-variant-numeric:tabular-nums; letter-spacing:.26em; font-weight:600 }
+  .hist .n{ margin-left:auto; font-weight:700; font-size:12px }
+  .hist .n.good{ color:var(--good) } .hist .n.bad{ color:var(--bad) }
+  .hist .time{ color:#6b6358; font-size:10px; min-width:36px; text-align:right }
+  .hist .empty{ color:var(--muted); justify-content:center; opacity:.7 }
+  .clear{
+    margin-top:10px; width:100%; padding:9px; font-size:12px; font-family:inherit;
+    background:transparent; color:var(--muted); border:1px solid var(--line);
+    border-radius:8px; cursor:pointer;
+  }
+  .clear:hover{ color:var(--text) }
+
+  /* ── タイトル画面 ── */
+  #title{
+    position:fixed; inset:0; z-index:50; padding:24px 18px;
+    display:flex; overflow:auto;    /* 画面が低くても切れずにスクロールできる */
+    background:radial-gradient(circle at 50% 34%, #272c34 0%, #14171c 55%, #0a0c0f 100%);
+    transition:opacity .45s ease, visibility .45s;
+  }
+  #title.hide{ opacity:0; visibility:hidden; pointer-events:none }
+  #title .tbox{
+    margin:auto; display:flex; flex-direction:column; align-items:center;
+  }
+  #title .big{
+    margin:0 0 22px; font-size:clamp(34px,10vw,54px); font-weight:700; color:var(--gold);
+    letter-spacing:.3em; text-indent:.3em; text-shadow:0 0 44px rgba(217,176,106,.28);
+  }
+  #title .rule{ width:58px; height:1px; background:var(--gold); opacity:.45; margin:0 0 24px }
+  #title .note{
+    opacity:1;   /* ゲーム画面の .note は透明から始まる設定なので、ここで打ち消す */
+    max-width:340px; margin:0 0 28px; padding:15px 17px;
+    font-size:12.5px; line-height:1.95; color:var(--muted); text-align:center;
+    background:rgba(255,255,255,.035); border:1px solid var(--line); border-radius:12px;
+  }
+  #title .note .lead{
+    display:block; margin-bottom:9px; padding-bottom:9px;
+    font-size:14.5px; font-weight:700; line-height:1.7; color:var(--text);
+    border-bottom:1px solid var(--line);
+  }
+  #title .note .lead em{ font-style:normal; color:var(--gold); font-size:17px }
+  #title .state{ display:block; margin-top:10px; font-weight:700; letter-spacing:.1em }
+  #title .state.on{ color:var(--bad) }
+  #title .state.off{ color:#6b6358 }
+  #big-secret{ padding:14px 10px; margin:-14px -10px; cursor:pointer }
+
+  /* ── 全体の並び（左：ゲーム／右：役の表） ── */
+  .wrap{
+    display:flex; gap:26px; align-items:flex-start; justify-content:center;
+    flex-wrap:wrap; width:100%;
+  }
+  .stage{ display:flex; flex-direction:column; align-items:center; gap:18px }
+
+  /* ── 役の表 ── */
+  .guide{
+    width:236px; padding:16px 13px;
+    background:rgba(255,255,255,.035); border:1px solid var(--line); border-radius:14px;
+    position:sticky; top:26px;
+  }
+  .guide h2{
+    font-size:11px; letter-spacing:.2em; color:var(--gold);
+    margin:0 0 13px; text-align:center; font-weight:600;
+  }
+  .guide ol{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:3px }
+  .guide li{
+    display:flex; align-items:center; gap:9px;
+    padding:7px 8px; border-radius:9px; border:1px solid transparent;
+    transition:background .25s ease, border-color .25s ease;
+  }
+  .guide li.on{
+    background:rgba(240,194,86,.13); border-color:rgba(240,194,86,.45);
+  }
+  .guide .ds{ display:flex; gap:3px; flex-shrink:0 }
+  .guide .txt{ display:flex; flex-direction:column; line-height:1.25 }
+  .guide .txt b{ font-size:12.5px; font-weight:700 }
+  .guide .txt em{ font-style:normal; font-size:10px; color:var(--muted); margin-top:1px }
+  .guide .mul{ margin-left:auto; font-size:11px; font-weight:700; color:var(--gold); white-space:nowrap }
+  .guide li[data-key="hifumi"] .mul{ color:var(--bad) }
+  .guide li[data-key="nashi"] .mul{ color:var(--muted) }
+  .guide .hint{ font-size:10px; color:#6b6358; text-align:center; margin:13px 0 0 }
+
+  /* 表の中の小さいサイコロ */
+  .die.mini{
+    position:static; margin:0; width:19px; height:19px;
+    border-radius:4px; padding:2.5px; gap:1px;
+    box-shadow:0 2px 5px rgba(0,0,0,.45);
+    transform:none !important;
+  }
+</style>
+</head>
+<body>
+
+<!-- ゲームに入る前のタイトル画面 -->
+<div id="title">
+  <div class="tbox">
+    <h2 class="big">チンチ<span id="big-secret">ロ</span></h2>
+    <div class="rule"></div>
+    <p class="note">
+      <span class="lead">「チンチ<em>ロ</em>」の<em>ロ</em>を押すと<br>イカサマができます</span>
+      もう一度押すと元に戻ります。
+      <span class="state off" id="state">正常モード</span>
+    </p>
+    <button class="roll" id="start">は じ め る</button>
+  </div>
+</div>
+
+<h1>チンチ<span id="secret">ロ</span></h1>
+
+<div class="wrap">
+
+<div class="stage">
+
+<div class="bowl" id="bowl">
+  <div class="die" data-v="1"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="die" data-v="1"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="die" data-v="1"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+</div>
+
+<div class="result">
+  <div class="yaku" id="yaku"></div>
+  <div class="note" id="note"></div>
+</div>
+
+<button class="roll" id="roll">振 る</button>
+
+<div class="hist">
+  <h2>出目の履歴 <span id="count">0回</span></h2>
+  <div class="tally" id="tally"></div>
+  <div class="scroll"><ul id="list"></ul></div>
+  <button class="clear" id="clear">記録をぜんぶ消す</button>
+</div>
+
+</div><!-- 左側ここまで -->
+
+<aside class="guide">
+  <h2>役 の 強 さ</h2>
+  <ol id="guide"></ol>
+  <p class="hint">上ほど強い　／　出た役が光ります</p>
+</aside>
+
+</div><!-- 全体ここまで -->
+
+<script>
+  var KEY = "chinchiro-v1";
+  var dice = Array.prototype.slice.call(document.querySelectorAll(".die"));
+  var bowl   = document.getElementById("bowl");
+  var btn    = document.getElementById("roll");
+  var yakuEl = document.getElementById("yaku");
+  var noteEl = document.getElementById("note");
+  var rolling = false;
+  var rolls = [];
+
+  try { rolls = JSON.parse(localStorage.getItem(KEY)) || []; } catch(e) { rolls = []; }
+
+  /* さいころ1つ分のランダムな目（1〜6） */
+  function d6(){ return Math.floor(Math.random() * 6) + 1; }
+
+  /* ─────────────────────────────
+     ここから下は「イカサマ」の仕組み
+     「チンチロ」の“ロ”を押すと ON / OFF が切り替わる
+     ───────────────────────────── */
+  var cheat = false;
+
+  /* 並び順をバラバラにする（4・5・6 がいつも同じ並びだと不自然なので） */
+  function shuffle(a){
+    for (var i = a.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+    }
+    return a;
+  }
+
+  /* イカサマ中の出目：シゴロ60％／ゾロ目(2〜6)30％／ピンゾロ10％ */
+  function cheatRoll(){
+    var r = Math.random();
+    if (r < 0.60) return shuffle([4, 5, 6]);
+    if (r < 0.90){
+      var n = Math.floor(Math.random() * 5) + 2;   /* 2〜6 */
+      return [n, n, n];
+    }
+    return [1, 1, 1];
+  }
+
+  var stateEl = document.getElementById("state");
+
+  /* タイトル画面の「いまは○○モード」の表示を書き替える */
+  function updateState(){
+    stateEl.textContent = cheat ? "イカサマモード" : "正常モード";
+    stateEl.className   = "state " + (cheat ? "on" : "off");
+  }
+
+  function toggleCheat(){
+    cheat = !cheat;      /* 押すたびに ON ↔ OFF が入れ替わる */
+    updateState();
+  }
+
+  /* タイトル画面の「ロ」でも、ゲーム画面の「ロ」でも切り替えられる */
+  document.getElementById("big-secret").onclick = toggleCheat;
+  document.getElementById("secret").onclick     = toggleCheat;
+
+  /* 「はじめる」でタイトル画面を消してゲームへ */
+  document.getElementById("start").onclick = function(){
+    document.getElementById("title").classList.add("hide");
+  };
+
+  updateState();
+
+  /* お椀の中のランダムな位置に置く */
+  function place(die, dist, deg){
+    var a = Math.random() * Math.PI * 2;
+    var r = Math.sqrt(Math.random()) * dist;
+    die.style.transform =
+      "translate(" + (Math.cos(a) * r).toFixed(1) + "px," + (Math.sin(a) * r).toFixed(1) + "px)" +
+      " rotate(" + deg.toFixed(0) + "deg)";
+  }
+
+  /* 役を決める（標準ルール） */
+  function judge(v){
+    var s = v.slice().sort(function(a, b){ return a - b; }).join("");
+    if (v[0] === v[1] && v[1] === v[2]){
+      if (v[0] === 1) return { name:"ピンゾロ", note:"最強の役　5倍取り", cls:"good" };
+      return { name: v[0] + "のゾロ目", note:"強い役　3倍取り", cls:"good" };
+    }
+    if (s === "456") return { name:"シゴロ", note:"4・5・6　2倍取り", cls:"good" };
+    if (s === "123") return { name:"ヒフミ", note:"1・2・3　2倍払いの負け", cls:"bad" };
+
+    var eye = null;
+    if (v[0] === v[1]) eye = v[2];
+    else if (v[1] === v[2]) eye = v[0];
+    else if (v[0] === v[2]) eye = v[1];
+
+    if (eye !== null){
+      return {
+        name: "出目 " + eye,
+        note: eye >= 4 ? "まずまずの目" : "弱い目",
+        cls: ""
+      };
+    }
+    return { name:"目なし", note:"バラバラ　振り直し", cls:"" };
+  }
+
+  function save(){
+    try { localStorage.setItem(KEY, JSON.stringify(rolls.slice(-300))); } catch(e){}
+  }
+
+  /* 役の名前から、集計のどの箱に入れるかを決める */
+  function group(name){
+    if (name === "ピンゾロ") return "pin";
+    if (name === "シゴロ")   return "shigoro";
+    if (name === "ヒフミ")   return "hifumi";
+    if (name === "目なし")   return "nashi";
+    if (name.indexOf("ゾロ目") >= 0) return "zoro";
+    return "deme";
+  }
+
+  function draw(){
+    var total = rolls.length;
+    var t = { pin:0, zoro:0, shigoro:0, deme:0, hifumi:0, nashi:0 };
+    rolls.forEach(function(h){ t[group(h.name)]++; });
+
+    document.getElementById("count").textContent = total + "回";
+
+    var cells = [
+      ["ピンゾロ", t.pin], ["ゾロ目", t.zoro], ["シゴロ", t.shigoro],
+      ["出目", t.deme],    ["ヒフミ", t.hifumi], ["目なし", t.nashi]
+    ];
+    document.getElementById("tally").innerHTML = cells.map(function(c){
+      return '<div class="' + (c[1] > 0 && c[0] === "ピンゾロ" ? "hit" : "") + '">' +
+             "<b>" + c[1] + "</b>" + c[0] + "</div>";
+    }).join("");
+
+    var list = document.getElementById("list");
+    list.innerHTML = "";
+    if (!total){
+      list.innerHTML = '<li class="empty">まだ振っていません</li>';
+      return;
+    }
+    /* 新しいものが上に来るように、逆さまにして全部並べる */
+    rolls.slice().reverse().forEach(function(h, i){
+      var li = document.createElement("li");
+      li.innerHTML =
+        '<span class="no">' + (total - i) + '</span>' +
+        '<span class="eyes">' + h.v.join(" ") + '</span>' +
+        '<span class="n ' + h.cls + '">' + h.name + '</span>' +
+        '<span class="time">' + (h.t || "") + '</span>';
+      list.appendChild(li);
+    });
+  }
+
+  /* 3つのサイコロが最後に落ち着く場所を、重ならないように決めておく */
+  function finalSpots(){
+    var base = Math.random() * 360;
+    return [0, 1, 2].map(function(i){
+      var deg = base + i * 120 + (Math.random() * 40 - 20);
+      var rad = deg * Math.PI / 180;
+      var r   = 44 + Math.random() * 18;
+      return {
+        x: Math.cos(rad) * r,
+        y: Math.sin(rad) * r,
+        rot: Math.random() * 360
+      };
+    });
+  }
+
+  /* サイコロ1つを、決められた時刻まで転がし続けて止める */
+  function spin(die, endTime, spot, finalValue, onStop){
+    function step(){
+      var remain = endTime - performance.now();
+
+      if (remain <= 0){                       /* 時間が来た → 止める */
+        die.dataset.v = finalValue;
+        die.style.transition = "transform .32s cubic-bezier(.18,1.35,.4,1)";
+        die.style.transform =
+          "translate(" + spot.x.toFixed(1) + "px," + spot.y.toFixed(1) + "px)" +
+          " rotate(" + spot.rot.toFixed(0) + "deg)";
+        onStop();
+        return;
+      }
+
+      /* 残りが少ないほど、次のパラパラまでの間を長くする＝だんだん減速 */
+      var wait = remain < 500 ? 55 + (500 - remain) * 0.55 : 55;
+
+      die.dataset.v = d6();
+      die.style.transition = "transform " + Math.min(wait, 170).toFixed(0) + "ms linear";
+      place(die, 82, Math.random() * 360);
+
+      setTimeout(step, wait);
+    }
+    step();
+  }
+
+  /* 3つとも止まったあとの後始末 */
+  function finish(v, y){
+    try {
+      setTimeout(function(){
+        yakuEl.textContent = y.name;
+        yakuEl.className = "yaku show " + y.cls;
+        noteEl.textContent = y.note;
+        noteEl.classList.add("show");
+        highlight(y.name);
+      }, 260);
+
+      var now = new Date();
+      var time = String(now.getHours()).padStart(2, "0") + ":" +
+                 String(now.getMinutes()).padStart(2, "0");
+      rolls.push({ v: v, name: y.name, cls: y.cls, t: time });
+      if (rolls.length > 300) rolls = rolls.slice(-300);   /* 保存できる上限に合わせる */
+      save();
+      draw();
+    } finally {
+      rolling = false;
+      btn.disabled = false;
+    }
+  }
+
+  function roll(){
+    if (rolling) return;
+    rolling = true;
+    btn.disabled = true;
+    bowl.classList.add("shaking");
+    yakuEl.classList.remove("show", "good", "bad");
+    noteEl.classList.remove("show");
+    highlight(null);
+
+    /* 出目は先に決めておく。イカサマ中だけ中身がすり替わる */
+    var v = cheat ? cheatRoll() : [d6(), d6(), d6()];
+    var y = judge(v);
+    var spots = finalSpots();
+
+    /* 今回の長さ：だいたい0.9〜2.3秒。15回に2回くらい、さらに1秒ながい */
+    var total = 900 + Math.random() * 1400;
+    if (Math.random() < 0.15) total += 1000;
+
+    /* お椀のガタガタは早めに止めて、最後は静かに見せる */
+    setTimeout(function(){ bowl.classList.remove("shaking"); }, total * 0.42);
+
+    /* 1つ目 → 2つ目 → 3つ目 の順に、時間差で止まる */
+    var t0 = performance.now();
+    var stops = [
+      total * (0.54 + Math.random() * 0.07),
+      total * (0.75 + Math.random() * 0.07),
+      total
+    ];
+
+    var left = 3;
+    dice.forEach(function(die, i){
+      spin(die, t0 + stops[i], spots[i], v[i], function(){
+        left--;
+        if (left === 0) finish(v, y);
+      });
+    });
+
+    /* 万一止まらなかったときの保険：必ずボタンを戻す */
+    setTimeout(function(){
+      rolling = false;
+      btn.disabled = false;
+    }, total + 2000);
+  }
+
+  btn.onclick = roll;
+
+  document.getElementById("clear").onclick = function(){
+    if (!rolls.length) return;
+    if (confirm("記録をぜんぶ消します。よろしいですか？")){
+      rolls = [];
+      save();
+      draw();
+    }
+  };
+
+  /* ── 右側の「役の強さ」表 ── */
+  var GUIDE = [
+    { key:"pin",     v:[1,1,1], name:"ピンゾロ", sub:"1のゾロ目",    mul:"5倍" },
+    { key:"zoro",    v:[6,6,6], name:"ゾロ目",   sub:"同じ目が3つ",  mul:"3倍" },
+    { key:"shigoro", v:[4,5,6], name:"シゴロ",   sub:"4・5・6",      mul:"2倍" },
+    { key:"deme",    v:[3,3,5], name:"出目",     sub:"2つ揃い＋1つ", mul:"1倍" },
+    { key:"nashi",   v:[2,4,1], name:"目なし",   sub:"バラバラ",     mul:"振り直し" },
+    { key:"hifumi",  v:[1,2,3], name:"ヒフミ",   sub:"1・2・3",      mul:"2倍払い" }
+  ];
+
+  /* 小さいサイコロ1つ分の見た目を作る */
+  function dieHTML(v){
+    return '<span class="die mini" data-v="' + v + '">' +
+           "<i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>";
+  }
+
+  document.getElementById("guide").innerHTML = GUIDE.map(function(g){
+    return '<li data-key="' + g.key + '">' +
+             '<span class="ds">' + g.v.map(function(n){ return dieHTML(n); }).join("") + "</span>" +
+             '<span class="txt"><b>' + g.name + "</b><em>" + g.sub + "</em></span>" +
+             '<span class="mul">' + g.mul + "</span>" +
+           "</li>";
+  }).join("");
+
+  /* 出た役の行を光らせる（name が空なら全部消す） */
+  function highlight(name){
+    var k = name ? group(name) : null;
+    Array.prototype.forEach.call(document.querySelectorAll("#guide li"), function(li){
+      if (li.dataset.key === k) li.classList.add("on");
+      else li.classList.remove("on");
+    });
+  }
+
+  /* 最初の見た目を整える */
+  dice.forEach(function(die){ place(die, 50, Math.random() * 360); });
+  draw();
+</script>
+</body>
+</html>
