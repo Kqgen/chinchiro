@@ -2,8 +2,18 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>チンチロ</title>
+
+<!-- ここから下は「スマホのアプリとして扱ってもらう」ための設定 -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14171c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="チンチロ">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
 <style>
   :root{
     --gold:#d9b06a; --text:#efe6d8; --muted:#9a8f7f;
@@ -571,6 +581,13 @@
   /* 最初の見た目を整える */
   dice.forEach(function(die){ place(die, 50, Math.random() * 360); });
   draw();
+
+  /* オフラインでも遊べるように、留守番役を登録する */
+  if ("serviceWorker" in navigator){
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("sw.js").catch(function(){});
+    });
+  }
 </script>
 </body>
 </html>
