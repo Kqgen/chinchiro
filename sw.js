@@ -1,7 +1,7 @@
 /* オフラインでも遊べるようにするための「留守番役」。
    一度開いたページを手元に保存しておき、電波がなくても出してくれる。 */
 
-var CACHE = "chinchiro-v2";
+var CACHE = "chinchiro-v3";
 var FILES = [
   "./",
   "./index.html",
